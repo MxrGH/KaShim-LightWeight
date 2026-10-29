@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 jobs:
-  01_repository_inventory:
+  stage_01_repository_inventory:
     name: "01 - Repository inventory"
     runs-on: ubuntu-latest
     steps:
@@ -29,9 +29,9 @@ jobs:
           test -s shaders/final.vsh
           test -s shaders/final.fsh
 
-  02_shader_layout:
+  stage_02_shader_layout:
     name: "02 - Shader layout validation"
-    needs: 01_repository_inventory
+    needs: stage_01_repository_inventory
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -46,9 +46,9 @@ jobs:
             }
           done
 
-  03_options_menu:
+  stage_03_options_menu:
     name: "03 - Iris configuration menu"
-    needs: 02_shader_layout
+    needs: stage_02_shader_layout
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -63,9 +63,9 @@ jobs:
           grep -q 'GODRAY_STRENGTH' shaders/composite.fsh
           grep -q 'GODRAY_SAMPLES' shaders/composite.fsh
 
-  04_effect_scope:
+  stage_04_effect_scope:
     name: "04 - Lightweight effects audit"
-    needs: 03_options_menu
+    needs: stage_03_options_menu
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -82,9 +82,9 @@ jobs:
             exit 1
           fi
 
-  05_documentation:
+  stage_05_documentation:
     name: "05 - Documentation review"
-    needs: 04_effect_scope
+    needs: stage_04_effect_scope
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -97,9 +97,9 @@ jobs:
           grep -iq 'configure' README.md
           grep -q 'shaders.properties' README.md
 
-  06_build_shaderpack:
+  stage_06_build_shaderpack:
     name: "06 - Build downloadable shaderpack"
-    needs: 05_documentation
+    needs: stage_05_documentation
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -123,9 +123,9 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  07_final_report:
+  stage_07_final_report:
     name: "07 - Final quality report"
-    needs: 06_build_shaderpack
+    needs: stage_06_build_shaderpack
     runs-on: ubuntu-latest
     steps:
       - name: Publish final checklist
