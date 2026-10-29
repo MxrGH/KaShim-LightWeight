@@ -15,17 +15,26 @@ jobs:
     name: Validate and package shaderpack
     runs-on: ubuntu-latest
     steps:
-      - name: Check and build KaShim
-        uses: actions/checkout@v4
-      - name: Run all checks and create ZIP
+      - name: Validate and package in one step
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
 
-          echo "== KaShim [LightWeight] repository =="
+          echo "== Download source for this workflow commit =="
+          mkdir -p source
+          curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/zipball/${GITHUB_SHA}" \
+            -o source.zip
+          unzip -q source.zip -d source
+          cd "$(find source -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+
+          echo "== Repository inventory =="
           find . -maxdepth 4 -type f -not -path './.git/*' | sort
 
-          echo "== Required files =="
+          echo "== Required files and shader entry points =="
           test -f README.md
           test -f shaders.properties
           for file in shaders/composite.vsh shaders/composite.fsh shaders/final.vsh shaders/final.fsh; do
@@ -57,7 +66,7 @@ jobs:
           grep -iq 'configure' README.md
           grep -q 'shaders.properties' README.md
 
-          echo "== Build ZIP =="
+          echo "== Build and validate ZIP =="
           mkdir -p 'dist/KaShim [LightWeight]/shaders'
           cp README.md 'dist/KaShim [LightWeight]/README.md'
           cp shaders.properties 'dist/KaShim [LightWeight]/shaders.properties'
