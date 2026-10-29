@@ -69,3 +69,11 @@ jobs:
             echo "> Static checks do not replace an in-game test with Iris and Sodium."
           } >> "$GITHUB_STEP_SUMMARY"
           echo "SUCCESS: KaShim-LightWeight.zip was built and validated."
+
+      - name: Upload downloadable ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: KaShim-LightWeight
+          path: source/*/dist/KaShim-LightWeight.zip
+          if-no-files-found: error
+          retention-days: 30
