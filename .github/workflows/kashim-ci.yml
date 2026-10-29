@@ -1,4 +1,4 @@
-name: KaShim [LightWeight] - Sequential Quality Workflow
+name: KaShim [LightWeight] - Quality Check
 
 on:
   push:
@@ -11,50 +11,29 @@ permissions:
   contents: read
 
 jobs:
-  stage_01_repository_inventory:
-    name: "01 - Repository inventory"
+  kashim:
+    name: Validate and package shaderpack
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Print project inventory
-        run: |
-          echo "KaShim [LightWeight]"
-          find . -maxdepth 4 -type f -not -path './.git/*' | sort
-      - name: Check expected shaderpack files
-        run: |
-          test -f README.md
-          test -f shaders.properties
-          test -s shaders/composite.vsh
-          test -s shaders/composite.fsh
-          test -s shaders/final.vsh
-          test -s shaders/final.fsh
-
-  stage_02_shader_layout:
-    name: "02 - Shader layout validation"
-    needs: stage_01_repository_inventory
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Validate shader entry points
+      - name: Check and build KaShim
+        uses: actions/checkout@v4
+      - name: Run all checks and create ZIP
         shell: bash
         run: |
           set -euo pipefail
+
+          echo "== KaShim [LightWeight] repository =="
+          find . -maxdepth 4 -type f -not -path './.git/*' | sort
+
+          echo "== Required files =="
+          test -f README.md
+          test -f shaders.properties
           for file in shaders/composite.vsh shaders/composite.fsh shaders/final.vsh shaders/final.fsh; do
-            grep -Eq 'void[[:space:]]+main[[:space:]]*\(' "$file" || {
-              echo "::error file=$file::Missing main() entry point"
-              exit 1
-            }
+            test -s "$file"
+            grep -Eq 'void[[:space:]]+main[[:space:]]*\(' "$file"
           done
 
-  stage_03_options_menu:
-    name: "03 - Iris configuration menu"
-    needs: stage_02_shader_layout
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Validate configurable controls
-        run: |
-          set -euo pipefail
+          echo "== Iris options =="
           grep -q 'GODRAY_STRENGTH' shaders.properties
           grep -q 'GODRAY_SAMPLES' shaders.properties
           grep -q '^screen=' shaders.properties
@@ -63,82 +42,37 @@ jobs:
           grep -q 'GODRAY_STRENGTH' shaders/composite.fsh
           grep -q 'GODRAY_SAMPLES' shaders/composite.fsh
 
-  stage_04_effect_scope:
-    name: "04 - Lightweight effects audit"
-    needs: stage_03_options_menu
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Check intended lighting effects
-        run: |
+          echo "== Lightweight effects =="
           grep -Eiq 'ray|godray|sunPosition|moonPosition' shaders/composite.fsh
           grep -Eiq 'sun|moon|light' README.md
-      - name: Reject heavyweight post-processing
-        shell: bash
-        run: |
-          set -euo pipefail
           if grep -RniE 'motion[ _-]?blur|depth[ _-]?of[ _-]?field|path[ _-]?tracing' shaders; then
             echo "::error::Unexpected heavyweight post-processing found."
             exit 1
           fi
 
-  stage_05_documentation:
-    name: "05 - Documentation review"
-    needs: stage_04_effect_scope
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Verify setup instructions
-        run: |
-          set -euo pipefail
+          echo "== Documentation =="
           grep -iq 'Sodium' README.md
           grep -iq 'Iris' README.md
           grep -iq 'KaShim' README.md
           grep -iq 'configure' README.md
           grep -q 'shaders.properties' README.md
 
-  stage_06_build_shaderpack:
-    name: "06 - Build downloadable shaderpack"
-    needs: stage_05_documentation
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Stage distributable files
-        run: |
-          set -euo pipefail
+          echo "== Build ZIP =="
           mkdir -p 'dist/KaShim [LightWeight]/shaders'
           cp README.md 'dist/KaShim [LightWeight]/README.md'
           cp shaders.properties 'dist/KaShim [LightWeight]/shaders.properties'
           cp shaders/*.vsh shaders/*.fsh 'dist/KaShim [LightWeight]/shaders/'
-      - name: Create and validate ZIP
-        run: |
-          cd dist
-          zip -r 'KaShim-LightWeight.zip' 'KaShim [LightWeight]'
-          unzip -t 'KaShim-LightWeight.zip'
-      - name: Upload ZIP artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: KaShim-LightWeight
-          path: dist/KaShim-LightWeight.zip
-          if-no-files-found: error
-          retention-days: 14
+          (cd dist && zip -r 'KaShim-LightWeight.zip' 'KaShim [LightWeight]' && unzip -t 'KaShim-LightWeight.zip')
 
-  stage_07_final_report:
-    name: "07 - Final quality report"
-    needs: stage_06_build_shaderpack
-    runs-on: ubuntu-latest
-    steps:
-      - name: Publish final checklist
-        run: |
+          echo "All static checks passed. ZIP created at dist/KaShim-LightWeight.zip"
           {
-            echo "## KaShim [LightWeight] - Workflow Report"
+            echo "## KaShim [LightWeight] - Quality Report"
             echo
-            echo "- [x] Repository inventory checked"
-            echo "- [x] Shader entry points checked"
-            echo "- [x] Iris configuration controls checked"
-            echo "- [x] Lightweight effect scope checked"
-            echo "- [x] Documentation checked"
-            echo "- [x] ZIP artifact assembled and uploaded"
+            echo "- [x] Required files and shader entry points"
+            echo "- [x] Iris configuration controls"
+            echo "- [x] Lightweight effects audit"
+            echo "- [x] Documentation review"
+            echo "- [x] ZIP package created and validated"
             echo
             echo "> Static checks do not replace an in-game compatibility test with the target Iris and Sodium versions."
           } >> "$GITHUB_STEP_SUMMARY"
