@@ -1,14 +1,15 @@
 # KaShim [LightWeight]
 
-A lightweight Minecraft Java shaderpack for **Sodium + Iris** focused on cinematic sunrise/moonrise lighting and screen-space god rays.
+A lightweight Minecraft Java shaderpack for **Sodium + Iris** with a subtle cinematic look.
 
 ## Features
-- Warm amber / peach rays at sunrise and sunset
-- Cool silver-blue moon rays
-- Configurable god-ray strength and sample count in the Iris shader settings menu
-- No depth of field, motion blur, or heavy bloom stack
+- Warm color grading with adjustable intensity
+- Adjustable contrast
+- Soft vignette with adjustable strength
+- Lightweight post-processing designed to keep the image clear
+- Iris shader menu controls for all three effects
 
 ## Install
-Place the shaderpack folder (containing `shaders/` and `shaders.properties`) in `.minecraft/shaderpacks`, then select **KaShim [LightWeight]** in Iris.
+Place the **KaShim [LightWeight]** folder (containing `shaders/` and `shaders.properties`) in `.minecraft/shaderpacks`, then select **KaShim [LightWeight]** in Iris.
 
-This is a minimal shaderpack starting point. Visual results may vary with Minecraft and Iris versions.
+The pack applies its effects in the composite pass. CI checks the shader files and builds a ZIP, but the pack still needs an in-game test with your Minecraft, Iris, and Sodium versions.
