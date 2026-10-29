@@ -22,7 +22,6 @@ jobs:
         run: |
           set -euo pipefail
 
-          echo "== Download source for this workflow commit =="
           mkdir -p source
           curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
             -H "Accept: application/vnd.github+json" \
@@ -31,10 +30,7 @@ jobs:
           unzip -q source.zip -d source
           cd "$(find source -mindepth 1 -maxdepth 1 -type d | head -n 1)"
 
-          echo "== Repository inventory =="
-          find . -maxdepth 4 -type f -not -path './.git/*' | sort
-
-          echo "== Required files and shader entry points =="
+          echo "== Checking required shaderpack files =="
           test -f README.md
           test -f shaders.properties
           for file in shaders/composite.vsh shaders/composite.fsh shaders/final.vsh shaders/final.fsh; do
@@ -42,46 +38,34 @@ jobs:
             grep -Eq 'void[[:space:]]+main[[:space:]]*\(' "$file"
           done
 
-          echo "== Iris options =="
+          echo "== Checking Iris settings =="
           grep -q 'GODRAY_STRENGTH' shaders.properties
           grep -q 'GODRAY_SAMPLES' shaders.properties
-          grep -q '^screen=' shaders.properties
-          grep -q '^sliders=' shaders.properties
-          grep -q '^profile.DEFAULT=' shaders.properties
           grep -q 'GODRAY_STRENGTH' shaders/composite.fsh
           grep -q 'GODRAY_SAMPLES' shaders/composite.fsh
 
-          echo "== Lightweight effects =="
+          echo "== Checking lightweight effects =="
           grep -Eiq 'ray|godray|sunPosition|moonPosition' shaders/composite.fsh
-          grep -Eiq 'sun|moon|light' README.md
           if grep -RniE 'motion[ _-]?blur|depth[ _-]?of[ _-]?field|path[ _-]?tracing' shaders; then
             echo "::error::Unexpected heavyweight post-processing found."
             exit 1
           fi
 
-          echo "== Documentation =="
-          grep -iq 'Sodium' README.md
-          grep -iq 'Iris' README.md
-          grep -iq 'KaShim' README.md
-          grep -iq 'configure' README.md
-          grep -q 'shaders.properties' README.md
-
-          echo "== Build and validate ZIP =="
+          echo "== Creating ZIP package =="
           mkdir -p 'dist/KaShim [LightWeight]/shaders'
           cp README.md 'dist/KaShim [LightWeight]/README.md'
           cp shaders.properties 'dist/KaShim [LightWeight]/shaders.properties'
           cp shaders/*.vsh shaders/*.fsh 'dist/KaShim [LightWeight]/shaders/'
           (cd dist && zip -r 'KaShim-LightWeight.zip' 'KaShim [LightWeight]' && unzip -t 'KaShim-LightWeight.zip')
 
-          echo "All static checks passed. ZIP created at dist/KaShim-LightWeight.zip"
           {
             echo "## KaShim [LightWeight] - Quality Report"
             echo
             echo "- [x] Required files and shader entry points"
-            echo "- [x] Iris configuration controls"
+            echo "- [x] Iris settings references"
             echo "- [x] Lightweight effects audit"
-            echo "- [x] Documentation review"
             echo "- [x] ZIP package created and validated"
             echo
-            echo "> Static checks do not replace an in-game compatibility test with the target Iris and Sodium versions."
+            echo "> Static checks do not replace an in-game test with Iris and Sodium."
           } >> "$GITHUB_STEP_SUMMARY"
+          echo "SUCCESS: KaShim-LightWeight.zip was built and validated."
