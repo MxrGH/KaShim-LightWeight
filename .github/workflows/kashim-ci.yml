@@ -1,0 +1,144 @@
+name: KaShim [LightWeight] - Sequential Quality Workflow
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  01_repository_inventory:
+    name: "01 - Repository inventory"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Print project inventory
+        run: |
+          echo "KaShim [LightWeight]"
+          find . -maxdepth 4 -type f -not -path './.git/*' | sort
+      - name: Check expected shaderpack files
+        run: |
+          test -f README.md
+          test -f shaders.properties
+          test -s shaders/composite.vsh
+          test -s shaders/composite.fsh
+          test -s shaders/final.vsh
+          test -s shaders/final.fsh
+
+  02_shader_layout:
+    name: "02 - Shader layout validation"
+    needs: 01_repository_inventory
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate shader entry points
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in shaders/composite.vsh shaders/composite.fsh shaders/final.vsh shaders/final.fsh; do
+            grep -Eq 'void[[:space:]]+main[[:space:]]*\(' "$file" || {
+              echo "::error file=$file::Missing main() entry point"
+              exit 1
+            }
+          done
+
+  03_options_menu:
+    name: "03 - Iris configuration menu"
+    needs: 02_shader_layout
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate configurable controls
+        run: |
+          set -euo pipefail
+          grep -q 'GODRAY_STRENGTH' shaders.properties
+          grep -q 'GODRAY_SAMPLES' shaders.properties
+          grep -q '^screen=' shaders.properties
+          grep -q '^sliders=' shaders.properties
+          grep -q '^profile.DEFAULT=' shaders.properties
+          grep -q 'GODRAY_STRENGTH' shaders/composite.fsh
+          grep -q 'GODRAY_SAMPLES' shaders/composite.fsh
+
+  04_effect_scope:
+    name: "04 - Lightweight effects audit"
+    needs: 03_options_menu
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check intended lighting effects
+        run: |
+          grep -Eiq 'ray|godray|sunPosition|moonPosition' shaders/composite.fsh
+          grep -Eiq 'sun|moon|light' README.md
+      - name: Reject heavyweight post-processing
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -RniE 'motion[ _-]?blur|depth[ _-]?of[ _-]?field|path[ _-]?tracing' shaders; then
+            echo "::error::Unexpected heavyweight post-processing found."
+            exit 1
+          fi
+
+  05_documentation:
+    name: "05 - Documentation review"
+    needs: 04_effect_scope
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify setup instructions
+        run: |
+          set -euo pipefail
+          grep -iq 'Sodium' README.md
+          grep -iq 'Iris' README.md
+          grep -iq 'KaShim' README.md
+          grep -iq 'configure' README.md
+          grep -q 'shaders.properties' README.md
+
+  06_build_shaderpack:
+    name: "06 - Build downloadable shaderpack"
+    needs: 05_documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stage distributable files
+        run: |
+          set -euo pipefail
+          mkdir -p 'dist/KaShim [LightWeight]/shaders'
+          cp README.md 'dist/KaShim [LightWeight]/README.md'
+          cp shaders.properties 'dist/KaShim [LightWeight]/shaders.properties'
+          cp shaders/*.vsh shaders/*.fsh 'dist/KaShim [LightWeight]/shaders/'
+      - name: Create and validate ZIP
+        run: |
+          cd dist
+          zip -r 'KaShim-LightWeight.zip' 'KaShim [LightWeight]'
+          unzip -t 'KaShim-LightWeight.zip'
+      - name: Upload ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: KaShim-LightWeight
+          path: dist/KaShim-LightWeight.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  07_final_report:
+    name: "07 - Final quality report"
+    needs: 06_build_shaderpack
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish final checklist
+        run: |
+          {
+            echo "## KaShim [LightWeight] - Workflow Report"
+            echo
+            echo "- [x] Repository inventory checked"
+            echo "- [x] Shader entry points checked"
+            echo "- [x] Iris configuration controls checked"
+            echo "- [x] Lightweight effect scope checked"
+            echo "- [x] Documentation checked"
+            echo "- [x] ZIP artifact assembled and uploaded"
+            echo
+            echo "> Static checks do not replace an in-game compatibility test with the target Iris and Sodium versions."
+          } >> "$GITHUB_STEP_SUMMARY"
